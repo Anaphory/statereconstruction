@@ -3,14 +3,12 @@
  */
 package lucl.beast.statereconstruction;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.Assert;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import beast.evolution.tree.Node;
 import beast.util.TreeParser;
@@ -20,28 +18,13 @@ import beast.util.TreeParser;
  *
  */
 class TestAncestralStatesLogger {
-
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@BeforeAll
-	static void setUpBeforeClass() {
-	}
-
-	/**
-	 * @throws java.lang.Exception
-	 */
-	@BeforeEach
-	void setUp() {
-	}
-
 	/**
 	 * Test method for
 	 * {@link lucl.beast.statereconstruction.AncestralStatesLogger#initAndValidate()}.
 	 */
 	@Test
 	void testInitAndValidate() {
-		fail("Not yet implemented");
+		Assert.fail("Not yet implemented");
 	}
 
 	/**
@@ -50,7 +33,7 @@ class TestAncestralStatesLogger {
 	 */
 	@Test
 	void testInit() {
-		fail("Not yet implemented");
+		Assert.fail("Not yet implemented");
 	}
 
 	/**
@@ -59,16 +42,7 @@ class TestAncestralStatesLogger {
 	 */
 	@Test
 	void testLog() {
-		fail("Not yet implemented");
-	}
-
-	/**
-	 * Test method for
-	 * {@link lucl.beast.statereconstruction.AncestralStatesLogger#close(java.io.PrintStream)}.
-	 */
-	@Test
-	void testClose() {
-		fail("Not yet implemented");
+		Assert.fail("Not yet implemented");
 	}
 
 	/**
@@ -93,40 +67,35 @@ class TestAncestralStatesLogger {
 		focusNodes.clear();
 		focusNodes.add(c);
 		commonAncestors = AncestralStatesLogger.commonAncestors(focusNodes);
-		System.out.println(commonAncestors.toString());
-		assertEquals(c, commonAncestors.get(commonAncestors.size() - 1));
+		Assert.assertEquals(c, commonAncestors.get(commonAncestors.size() - 1));
 
 		focusNodes.clear();
 		focusNodes.add(c);
 		focusNodes.add(h);
 		commonAncestors = AncestralStatesLogger.commonAncestors(focusNodes);
-		System.out.println(commonAncestors.toString());
-		assertEquals(root, commonAncestors.get(commonAncestors.size() - 1));
+		Assert.assertEquals(root, commonAncestors.get(commonAncestors.size() - 1));
 
 		focusNodes.clear();
 		focusNodes.add(e);
 		focusNodes.add(g);
 		commonAncestors = AncestralStatesLogger.commonAncestors(focusNodes);
-		System.out.println(commonAncestors.toString());
-		assertEquals(h, commonAncestors.get(commonAncestors.size() - 1));
-		assertFalse(commonAncestors.contains(c));
+		Assert.assertEquals(h, commonAncestors.get(commonAncestors.size() - 1));
+		Assert.assertFalse(commonAncestors.contains(c));
 
 		focusNodes.clear();
 		focusNodes.add(d);
 		focusNodes.add(e);
 		focusNodes.add(g);
 		commonAncestors = AncestralStatesLogger.commonAncestors(focusNodes);
-		System.out.println(commonAncestors.toString());
-		assertEquals(h, commonAncestors.get(commonAncestors.size() - 1));
-		assertEquals(root, commonAncestors.get(0));
+		Assert.assertEquals(h, commonAncestors.get(commonAncestors.size() - 1));
+		Assert.assertEquals(root, commonAncestors.get(0));
 		
 		focusNodes.clear();
 		focusNodes.add(e);
 		focusNodes.add(h);
 		commonAncestors = AncestralStatesLogger.commonAncestors(focusNodes);
-		System.out.println(commonAncestors.toString());
-		assertEquals(h, commonAncestors.get(commonAncestors.size() - 1));
-		assertFalse(commonAncestors.contains(c));
+		Assert.assertEquals(h, commonAncestors.get(commonAncestors.size() - 1));
+		Assert.assertFalse(commonAncestors.contains(c));
 	}
 
 }
