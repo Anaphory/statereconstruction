@@ -4,7 +4,9 @@
 package lucl.beast.statereconstruction;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,20 +25,15 @@ import beast.util.Randomizer;
  *
  */
 
-@Description("Logs internal states sampled from the distribution at the MRCA of a set of taxa")
+@Description("Logs internal states sampled from the distribution at the MRCAs of multiple sets of taxa")
 public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
-	public Input<TaxonSet> taxonsetInput = new Input<>("taxonset",
+	public Input<List<TaxonSet>> taxonsetInput = new Input<>("taxonset",
 			"set of taxa defining a clade. The MRCA node of the clade is logged", Validate.REQUIRED);
 	public Input<String> valueInput = new Input<>("value",
 			"space delimited set of labels, one for each site in the alignment. Used as site label in the log file.");
 	public Input<Boolean> logParentInput = new Input<>("logParent",
 			"flag to indicate the parent value should be logged", false);
-
-	// array of flags to indicate which taxa are in the set
-	protected Set<String> isInTaxaSet = new LinkedHashSet<>();
-	protected Node MRCA;
-	protected int[] parentSample;
-	protected boolean logParent;
+	private HashMap<Node, Integer[]> samples;
 
 	@Override
 	public void initAndValidate() {
@@ -57,68 +54,72 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 			}
 		}
 
-		isInTaxaSet.clear();
 		List<String> taxaNames = dataInput.get().getTaxaNames();
-		List<String> set = taxonsetInput.get().asStringList();
-		for (final String sTaxon : set) {
-			final int iTaxon = taxaNames.indexOf(sTaxon);
-			if (iTaxon < 0) {
-				throw new IllegalArgumentException("Cannot find taxon " + sTaxon + " in data");
+		for (final TaxonSet set : taxonsetInput.get()) {
+			Set<String> taxaSet = new LinkedHashSet<>();
+			taxaSet.clear();
+			for (final String sTaxon : set.asStringList()) {
+				final int iTaxon = taxaNames.indexOf(sTaxon);
+				if (iTaxon < 0) {
+					throw new IllegalArgumentException("Cannot find taxon " + sTaxon + " in data");
+				}
+				if (taxaSet.contains(sTaxon)) {
+					throw new IllegalArgumentException(
+							"Taxon " + sTaxon + " is defined multiple times, while they should be unique");
+				}
+				if (logParentInput.get() && taxaNames.size() == set.getTaxonCount()) {
+					throw new RuntimeException(
+							"Cannot log parent of the root; either choose a different clade, or set logParent flag to false");
+				}
+				taxaSet.add(sTaxon);
 			}
-			if (isInTaxaSet.contains(sTaxon)) {
-				throw new IllegalArgumentException(
-						"Taxon " + sTaxon + " is defined multiple times, while they should be unique");
-			}
-			isInTaxaSet.add(sTaxon);
-		}
-
-		logParent = logParentInput.get();
-		if (logParent && taxaNames.size() == set.size()) {
-			throw new RuntimeException(
-					"Cannot log parent of the root; either choose a different clade, or set logParent flag to false");
 		}
 	}
 
 	@Override
 	public void init(PrintStream out) {
-		String values = valueInput.get();
-		if (values != null && values.trim().length() > 0) {
-			// use values as labels
-			values = values.trim().replaceAll("\\s+", "\t");
-			out.append(values);
-			out.append("\t");
-		} else {
-			int siteCount = dataInput.get().getSiteCount();
-			for (int i = 0; i < siteCount; i++) {
-				out.append("site" + i + "\t");
+		for (TaxonSet taxa : taxonsetInput.get()) {
+			String idstring = taxa.getID();
+			String values = valueInput.get();
+			if (values != null && values.trim().length() > 0) {
+				// use values as labels
+				values = values.trim().replaceAll("\\s+", "\t" + idstring + ".");
+				out.append(values);
+				out.append("\t");
+			} else {
+				int siteCount = dataInput.get().getSiteCount();
+				for (int i = 0; i < siteCount; i++) {
+					out.append("idstring." + i + "\t");
+				}
 			}
 		}
 	}
 
 	@Override
 	public void log(int nSample, PrintStream out) {
-		try {
-			// force fresh recalculation of likelihood at this stage
-			Arrays.fill(m_branchLengths, 0);
-			calculateLogP();
+		// force fresh recalculation of likelihood at this stage
+		Arrays.fill(m_branchLengths, 0);
+		calculateLogP();
 
+		samples.clear();
+		for (TaxonSet taxonset : taxonsetInput.get()) {
 			// determine the MRCA node we are going to log
-			calcMRCA(treeInput.get().getRoot(), new int[1]);
+			List<String> taxa = taxonset.asStringList();
+			List<Node> leaves = treeInput.get().getRoot().getAllLeafNodes();
+			for (Node leaf: leaves) {
+				if (!taxa.contains(leaf.getID())) {
+					leaves.remove(leaf);
+				}
+			}
+			List<Node> common = commonAncestors(leaves);
 
 			// sample states
-			int[] sample = sample(MRCA);
+			Integer[] sample = sample(common.get(common.size() - 1));
 
 			// generate output
 			for (int i = 0; i < sample.length; i++) {
-				if (logParent) {
-					out.append(parentSample[i] + "");
-				}
 				out.append(sample[i] + "\t");
 			}
-
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 	}
 
@@ -128,10 +129,15 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 	 * 
 	 * @return sample
 	 */
-	private int[] sample(Node node) {
+	private Integer[] sample(Node node) {
+		try {
+			return samples.get(node);
+		} catch (IllegalArgumentException e) {
+			// Do nothing
+		}
 		int siteCount = dataInput.get().getSiteCount();
 		int stateCount = dataInput.get().getMaxStateCount();
-		int[] sample = new int[siteCount];
+		Integer[] sample = new Integer[siteCount];
 
 		if (node.isRoot()) {
 			if (beagle != null) {
@@ -150,7 +156,7 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 			}
 
 		} else {
-			parentSample = sample(node.getParent());
+			Integer[] parentSample = sample(node.getParent());
 
 			double[] p = new double[stateCount];
 			double[] partials = new double[dataInput.get().getPatternCount() * stateCount
@@ -223,6 +229,7 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 				}
 			}
 		}
+		samples.put(node, sample);
 		return sample;
 	}
 
@@ -231,32 +238,36 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 		// nothing to do
 	}
 
-	int calcMRCA(final Node node, final int[] nTaxonCount) {
-		if (node.isLeaf()) {
-			nTaxonCount[0]++;
-			if (isInTaxaSet.contains(node.getID())) {
-				if (isInTaxaSet.size() == 1) {
-					MRCA = node;
-					return 2;
-				}
-				return 1;
-			} else {
-				return 0;
-			}
+	public static List<Node> commonAncestors(final List<Node> taxa) {
+		if (taxa.size() == 0) {
+			throw new IllegalArgumentException("No taxa given");
 		} else {
-			int taxonCount = calcMRCA(node.getChild(0), nTaxonCount);
-			final int nLeftTaxa = nTaxonCount[0];
-			nTaxonCount[0] = 0;
-			if (node.getChild(1) != null) {
-				taxonCount += calcMRCA(node.getChild(1), nTaxonCount);
-				final int nRightTaxa = nTaxonCount[0];
-				nTaxonCount[0] = nLeftTaxa + nRightTaxa;
-				if (taxonCount == isInTaxaSet.size()) {
-					MRCA = node;
-					return taxonCount + 1;
-				}
+			Node here = taxa.get(0);
+			List<Node> routeToRoot = new ArrayList<>();
+			routeToRoot.add(here);
+			while (!here.isRoot()) {
+				here = here.getParent();
+				routeToRoot.add(0, here);
 			}
-			return taxonCount;
+			
+			if (taxa.size() == 1) {
+				return routeToRoot;
+			}
+			
+			int i = 0;
+			List<Node> commonRoute = new ArrayList<>(routeToRoot.size());
+			for (Node other: commonAncestors(taxa.subList(1, taxa.size()))) {
+				if (routeToRoot.size() < i) {
+					return routeToRoot;
+				}
+				if (other == routeToRoot.get(i)) {
+					commonRoute.add(other);
+				} else {
+					return commonRoute;
+				}
+				i += 1;
+			}
+			return commonRoute;
 		}
 	}
 
