@@ -114,11 +114,16 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 			List<Node> common = commonAncestors(leaves);
 
 			// sample states
-			Integer[] sample = sample(common.get(common.size() - 1));
-
+			Integer[] sampled;
+			if (logParentInput.get()) {
+				sampled = sample(common.get(common.size() - 2));				
+			} else {
+				sampled = sample(common.get(common.size() - 1));
+			}
+			
 			// generate output
-			for (int i = 0; i < sample.length; i++) {
-				out.append(sample[i] + "\t");
+			for (int i = 0; i < sampled.length; i++) {
+				out.append(sampled[i] + "\t");
 			}
 		}
 	}
