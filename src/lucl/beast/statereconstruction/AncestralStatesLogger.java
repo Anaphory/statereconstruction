@@ -31,10 +31,16 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 	public Input<List<TaxonSet>> taxonsetInput = new Input<List<TaxonSet>>("taxonset",
 			"set of taxa defining a clade. The MRCA node of the clade is logged", new ArrayList<TaxonSet>());
 	public Input<String> valueInput = new Input<>("value",
-			"space delimited set of labels, one for each site in the alignment. Used as site label in the log file.");
+			"space delimited set of labels, one for each site in the alignment. Used as site label in the log file.",
+			"");
 	public Input<Boolean> logParentInput = new Input<>("logParent",
 			"flag to indicate the parent value should be logged", false);
 	private HashMap<Node, Integer[]> samples = new HashMap<Node, Integer[]>();
+
+	protected String[] headers;
+	protected int correctedSiteCount;
+	protected int siteCount;
+	protected Set<Integer> exclusions;
 
 	@Override
 	public void initAndValidate() {
@@ -43,17 +49,6 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 		System.setProperty("java.only", "true");
 		super.initAndValidate();
 		System.setProperty("java.only", "" + forceJava);
-
-		String values = valueInput.get();
-		if (values != null && values.trim().length() > 0) {
-			// use values as labels
-			values = values.trim().replaceAll("\\s+", "\t");
-			String[] strs = values.split("\t");
-			if (strs.length != dataInput.get().getSiteCount()) {
-				throw new IllegalArgumentException("Number of labels (" + strs.length
-						+ ") does not match amountof data (" + dataInput.get().getSiteCount() + ") " + values);
-			}
-		}
 
 		List<String> taxaNames = dataInput.get().getTaxaNames();
 		for (final TaxonSet set : taxonsetInput.get()) {
@@ -75,20 +70,54 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 				taxaSet.add(sTaxon);
 			}
 		}
+
+		siteCount = dataInput.get().getSiteCount();
+		exclusions = dataInput.get().getExcludedPatternIndices();
+		correctedSiteCount = siteCount - dataInput.get().getExcludedPatternCount();
+
+		String values = valueInput.get();
+		if (values == null || values.trim().length() == 0) {
+			values = "site";
+		}
+		headers = values.trim().split("\\s+");
+		if (headers.length == 1 && correctedSiteCount > 1) {
+			String header = headers[0];
+			headers = new String[correctedSiteCount];
+			for (int i = 0; i < correctedSiteCount; i++) {
+				headers[i] = header + i;
+			}
+		} else if (headers.length == siteCount) {
+			String[] newHeaders = new String[correctedSiteCount];
+			for (int i = 0; i < correctedSiteCount; i++) {
+				if (exclusions.contains(i)) {
+					// Ignore that header
+				} else {
+					newHeaders[i] = headers[i];
+				}
+			}
+			headers = newHeaders;
+		}
+		if (headers.length != correctedSiteCount) {
+			throw new IllegalArgumentException("Could not match value input to number of patterns in data");
+		}
 	}
 
-	private static String formattedState(Integer[] state, DataType dataType) {
+	private String formattedState(Integer[] state, DataType dataType) {
 		// The idea of this function is taken from the beast-classic ASTL
 		StringBuffer sb = new StringBuffer();
 		if (dataType instanceof UserDataType) {
-			for (int i : state) {
-				sb.append(dataType.getCode(i));
-				sb.append("\t");
+			for (int i = 0; i < siteCount; i++) {
+				if (!exclusions.contains(i)) {
+					sb.append(dataType.getCode(state[i]));
+					sb.append("\t");
+				}
 			}
 		} else {
-			for (int i : state) {
-				sb.append(dataType.getChar(i));
-				sb.append("\t");
+			for (int i = 0; i < siteCount; i++) {
+				if (!exclusions.contains(i)) {
+					sb.append(dataType.getChar(state[i]));
+					sb.append("\t");
+				}
 			}
 		}
 		return sb.toString();
@@ -98,17 +127,8 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 	public void init(PrintStream out) {
 		for (TaxonSet taxa : taxonsetInput.get()) {
 			String idstring = taxa.getID();
-			String values = valueInput.get();
-			if (values != null && values.trim().length() > 0) {
-				// use values as labels
-				values = values.trim().replaceAll("\\s+", "\t" + idstring + ".");
-				out.append(values);
-				out.append("\t");
-			} else {
-				int siteCount = dataInput.get().getSiteCount();
-				for (int i = 0; i < siteCount; i++) {
-					out.append("idstring." + i + "\t");
-				}
+			for (int i = 0; i < correctedSiteCount; i++) {
+				out.append(idstring + ":" + headers[i] + "\t");
 			}
 		}
 	}
