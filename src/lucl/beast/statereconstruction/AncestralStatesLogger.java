@@ -13,9 +13,10 @@ import java.util.Set;
 
 import beast.core.Description;
 import beast.core.Input;
-import beast.core.Input.Validate;
 import beast.core.Loggable;
 import beast.evolution.alignment.TaxonSet;
+import beast.evolution.datatype.DataType;
+import beast.evolution.datatype.UserDataType;
 import beast.evolution.likelihood.TreeLikelihood;
 import beast.evolution.tree.Node;
 import beast.util.Randomizer;
@@ -27,13 +28,13 @@ import beast.util.Randomizer;
 
 @Description("Logs internal states sampled from the distribution at the MRCAs of multiple sets of taxa")
 public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
-	public Input<List<TaxonSet>> taxonsetInput = new Input<>("taxonset",
-			"set of taxa defining a clade. The MRCA node of the clade is logged", Validate.REQUIRED);
+	public Input<List<TaxonSet>> taxonsetInput = new Input<List<TaxonSet>>("taxonset",
+			"set of taxa defining a clade. The MRCA node of the clade is logged", new ArrayList<TaxonSet>());
 	public Input<String> valueInput = new Input<>("value",
 			"space delimited set of labels, one for each site in the alignment. Used as site label in the log file.");
 	public Input<Boolean> logParentInput = new Input<>("logParent",
 			"flag to indicate the parent value should be logged", false);
-	private HashMap<Node, Integer[]> samples;
+	private HashMap<Node, Integer[]> samples = new HashMap<Node, Integer[]>();
 
 	@Override
 	public void initAndValidate() {
@@ -76,6 +77,23 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 		}
 	}
 
+	private static String formattedState(Integer[] state, DataType dataType) {
+		// The idea of this function is taken from the beast-classic ASTL
+		StringBuffer sb = new StringBuffer();
+		if (dataType instanceof UserDataType) {
+			for (int i : state) {
+				sb.append(dataType.getCode(i));
+				sb.append("\t");
+			}
+		} else {
+			for (int i : state) {
+				sb.append(dataType.getChar(i));
+				sb.append("\t");
+			}
+		}
+		return sb.toString();
+	}
+
 	@Override
 	public void init(PrintStream out) {
 		for (TaxonSet taxa : taxonsetInput.get()) {
@@ -106,7 +124,7 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 			// determine the MRCA node we are going to log
 			List<String> taxa = taxonset.asStringList();
 			List<Node> leaves = treeInput.get().getRoot().getAllLeafNodes();
-			for (Node leaf: leaves) {
+			for (Node leaf : leaves) {
 				if (!taxa.contains(leaf.getID())) {
 					leaves.remove(leaf);
 				}
@@ -116,15 +134,12 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 			// sample states
 			Integer[] sampled;
 			if (logParentInput.get()) {
-				sampled = sample(common.get(common.size() - 2));				
+				sampled = sample(common.get(common.size() - 2));
 			} else {
 				sampled = sample(common.get(common.size() - 1));
 			}
-			
-			// generate output
-			for (int i = 0; i < sampled.length; i++) {
-				out.append(sampled[i] + "\t");
-			}
+			// generate output: convert output according to data type
+			out.append(formattedState(sampled, dataInput.get().getDataType()));
 		}
 	}
 
@@ -135,14 +150,13 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 	 * @return sample
 	 */
 	private Integer[] sample(Node node) {
-		try {
-			return samples.get(node);
-		} catch (IllegalArgumentException e) {
-			// Do nothing
+		Integer[] sample = samples.get(node);
+		if (sample != null) {
+			return sample;
 		}
 		int siteCount = dataInput.get().getSiteCount();
 		int stateCount = dataInput.get().getMaxStateCount();
-		Integer[] sample = new Integer[siteCount];
+		sample = new Integer[siteCount];
 
 		if (node.isRoot()) {
 			if (beagle != null) {
@@ -254,14 +268,14 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 				here = here.getParent();
 				routeToRoot.add(0, here);
 			}
-			
+
 			if (taxa.size() == 1) {
 				return routeToRoot;
 			}
-			
+
 			int i = 0;
 			List<Node> commonRoute = new ArrayList<>(routeToRoot.size());
-			for (Node other: commonAncestors(taxa.subList(1, taxa.size()))) {
+			for (Node other : commonAncestors(taxa.subList(1, taxa.size()))) {
 				if (routeToRoot.size() < i) {
 					return routeToRoot;
 				}
