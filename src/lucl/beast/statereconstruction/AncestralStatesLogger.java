@@ -41,7 +41,7 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 	protected int correctedSiteCount;
 	protected int siteCount;
 	protected Set<Integer> exclusions;
-
+	
 	@Override
 	public void initAndValidate() {
 		// ensure we do not use BEAGLE
@@ -143,8 +143,9 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 		for (TaxonSet taxonset : taxonsetInput.get()) {
 			// determine the MRCA node we are going to log
 			List<String> taxa = taxonset.asStringList();
+			List<Node> stickyLeaves = treeInput.get().getRoot().getAllLeafNodes();
 			List<Node> leaves = treeInput.get().getRoot().getAllLeafNodes();
-			for (Node leaf : leaves) {
+			for (Node leaf : stickyLeaves) {
 				if (!taxa.contains(leaf.getID())) {
 					leaves.remove(leaf);
 				}
