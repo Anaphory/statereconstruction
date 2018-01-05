@@ -88,11 +88,13 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 			}
 		} else if (headers.length == siteCount) {
 			String[] newHeaders = new String[correctedSiteCount];
-			for (int i = 0; i < correctedSiteCount; i++) {
+			int j = 0;
+			for (int i = 0; i < siteCount; i++) {
 				if (exclusions.contains(i)) {
 					// Ignore that header
 				} else {
-					newHeaders[i] = headers[i];
+					newHeaders[j] = headers[i];
+					++j;
 				}
 			}
 			headers = newHeaders;
