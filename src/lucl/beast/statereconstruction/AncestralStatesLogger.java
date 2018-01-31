@@ -7,6 +7,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -73,7 +74,12 @@ public class AncestralStatesLogger extends TreeLikelihood implements Loggable {
 
 		siteCount = dataInput.get().getSiteCount();
 		exclusions = dataInput.get().getExcludedPatternIndices();
-		correctedSiteCount = siteCount - dataInput.get().getExcludedPatternCount();
+		if (exclusions != null) {
+			correctedSiteCount = siteCount - dataInput.get().getExcludedPatternCount();
+		} else {
+			exclusions = new HashSet();
+			correctedSiteCount = siteCount;
+		}
 
 		String values = valueInput.get();
 		if (values == null || values.trim().length() == 0) {
