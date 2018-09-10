@@ -1,1 +1,1 @@
-README for my package.
+AncestralStatesLogger class for BEAST. As opposed to the ASL class in BEASTLabs, this class can log multiple states in multiple nodes, and it gives the datatype representation of the states to be logged, instead of the raw indices of the substitution model, which is relevant eg. for binary covarion model ASR.
